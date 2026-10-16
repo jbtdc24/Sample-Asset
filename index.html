@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Halloween Map – Prototype</title>
+<style>
+  :root { --accent:#ff7a1a; --glow:#7ff3ff; --panel:rgba(10,8,24,.92); --text:#f4efff; --muted:#a79fc4; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:#050510; color:var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+
+  /* Cover-fit a 16:9 stage to any screen, matching the crop rules in the spec */
+  .stage { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:max(100vw, 100vh * 16 / 9); height:max(100vh, 100vw * 9 / 16); }
+  .stage img.bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; user-select:none; pointer-events:none; }
+  .path { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .path polyline { fill:none; stroke:rgba(255,190,90,.85); stroke-width:.35; stroke-dasharray:1 .8; stroke-linecap:round; filter:drop-shadow(0 0 .4px #000); }
+
+  .pin { position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:none; border:0; color:var(--text); cursor:pointer; font:inherit; }
+  .pin .dot { width:22px; height:22px; border-radius:50%; background:var(--accent); border:3px solid #fff;
+    box-shadow:0 0 0 0 rgba(255,122,26,.7); animation: pulse 2s infinite; }
+  .pin.locked .dot { background:#4a4560; border-color:#8a84a3; animation:none; }
+  .pin.done .dot { background:#6fe39b; border-color:#fff; animation:none; }
+  .pin.ufo .dot { background:var(--glow); }
+  .pin.ufo.locked .dot { background:#2b3b44; border-color:#5d7b86; }
+  .pin .label { font-size:clamp(11px,1.1vw,16px); font-weight:700; padding:2px 8px; border-radius:6px;
+    background:rgba(0,0,0,.6); white-space:nowrap; text-shadow:0 1px 2px #000; }
+  .pin.locked .label { color:var(--muted); }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,122,26,.7)} 70%{box-shadow:0 0 0 14px rgba(255,122,26,0)} 100%{box-shadow:0 0 0 0 rgba(255,122,26,0)} }
+
+  header { position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; align-items:center; gap:12px; z-index:5; pointer-events:none; }
+  .title { background:var(--panel); padding:8px 14px; border-radius:10px; font-weight:800; letter-spacing:.5px; }
+  .progress { background:var(--panel); padding:8px 14px; border-radius:10px; font-size:14px; color:var(--muted); }
+  .reset { pointer-events:auto; background:none; border:1px solid #444; color:var(--muted); border-radius:8px; padding:4px 8px; cursor:pointer; font:inherit; font-size:12px; margin-left:8px; }
+
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:10; padding:16px; }
+  .modal.open { display:flex; }
+  .card { background:var(--panel); border:1px solid #3a3360; border-radius:16px; padding:22px; width:min(440px,100%); }
+  .card h2 { margin:0 0 6px; font-size:22px; }
+  .card p { color:var(--muted); line-height:1.5; margin:8px 0 16px; }
+  .card .reward { color:var(--glow); font-size:14px; margin-bottom:16px; }
+  .btns { display:flex; gap:10px; justify-content:flex-end; }
+  .btn { background:var(--accent); color:#130b00; border:0; border-radius:10px; padding:10px 16px; font-weight:800; cursor:pointer; font:inherit; }
+  .btn.ghost { background:none; color:var(--muted); border:1px solid #444; font-weight:600; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel); padding:10px 16px; border-radius:10px;
+    border:1px solid #3a3360; z-index:20; opacity:0; transition:opacity .3s; pointer-events:none; font-size:14px; }
+  .toast.show { opacity:1; }
+
+  @media (max-width:600px) {
+    .progress { display:none; }
+    .title { font-size:13px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <img class="bg" src="map/map_web_2560.jpg" alt="Halloween map">
+  <svg class="path" viewBox="0 0 100 100" preserveAspectRatio="none" id="path"></svg>
+  <div id="pins"></div>
+</div>
+
+<header>
+  <div class="title">🎃 Halloween Adventure <span style="color:var(--muted);font-weight:500">· <span id="mode">Beginner</span></span></div>
+  <div class="progress"><span id="progressText"></span><button class="reset" id="reset">reset</button></div>
+</header>
+
+<div class="modal" id="modal">
+  <div class="card">
+    <h2 id="mTitle"></h2>
+    <p id="mDesc"></p>
+    <div class="reward" id="mReward"></div>
+    <div class="btns">
+      <button class="btn ghost" id="mClose">Back</button>
+      <button class="btn" id="mGo">Start</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   LANDMARKS: x / y are % of the 16:9 map (0,0 = top-left).
+   FLOW: the linear run. Order here = order the path is walked.
+   Change order or add steps here; the path line and pins follow.
+   ------------------------------------------------------------------ */
+const LANDMARKS = {
+  entrance:  { x:37.91, y:98.54, name:"Entrance",           hidden:true },
+  pumpkin:   { x:19.77, y:58.23, name:"Pumpkin Field",      desc:"Pick your way through the vines. Find the lantern hidden in the pumpkins.", reward:"+ Pumpkin Charm" },
+  graveyard: { x:37.91, y:61.81, name:"Graveyard",          desc:"Solve the tomb inscriptions to open the chapel door.", reward:"+ Bone Lantern" },
+  ship:      { x:71.17, y:70.77, name:"Sunken Pirate Ship", desc:"Dive for the ship's chest before the tide turns.", reward:"+ Ghost Ship Skin" },
+  lab:       { x:56.56, y:35.83, name:"Science Laboratory", desc:"Fight through the lab. Lab battle against the mad scientists.", reward:"+ Serum Vial" },
+  boss:      { x:27.84, y:10.75, name:"Boss Hall",          desc:"Final battle. The boss waits behind the purple door.", reward:"+ Boss Crown" },
+};
+const FLOW = ["pumpkin", "graveyard", "ship", "lab", "boss"];
+// Beginner run -> Hard mode unlocks the UFO. Locked until Beginner is cleared.
+const UFO = { x:74.19, y:26.88, name:"UFO Wheat Field", desc:"Hidden in the fields. Only for those who beat the run.", reward:"+ UFO Skin" };
+const TOMB = { x:13.22, y:34.04, name:"Hidden Tomb", desc:"A secret spot. Not in the route yet, shown for layout only.", reward:"", hidden:true };
+
+/* ---------- state ---------- */
+const KEY = "halloween-proto-v1";
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || { done:[], beginnerCleared:false }; } catch { return { done:[], beginnerCleared:false }; } }
+function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} }
+let state = load();
+
+/* ---------- build the path ---------- */
+const pathPts = ["entrance", ...FLOW].map(k => `${LANDMARKS[k].x},${LANDMARKS[k].y}`).join(" ");
+document.getElementById("path").innerHTML = `<polyline points="${pathPts}"></polyline>`;
+
+/* ---------- pins ---------- */
+const pinsEl = document.getElementById("pins");
+function pin(id, lm, cls) {
+  const b = document.createElement("button");
+  b.className = `pin ${cls}`;
+  b.style.left = lm.x + "%"; b.style.top = lm.y + "%";
+  b.innerHTML = `<span class="dot"></span><span class="label">${lm.name}</span>`;
+  b.onclick = () => open(id);
+  pinsEl.appendChild(b);
+  return b;
+}
+
+function unlockedIndex() {
+  // first flow step not yet done
+  const i = FLOW.findIndex(k => !state.done.includes(k));
+  return i === -1 ? FLOW.length : i;
+}
+
+function render() {
+  pinsEl.innerHTML = "";
+  const idx = unlockedIndex();
+  FLOW.forEach((k, i) => {
+    const cls = state.done.includes(k) ? "done" : (i === idx ? "" : "locked");
+    pin(k, LANDMARKS[k], cls);
+  });
+  const ufoLocked = !state.beginnerCleared;
+  pin("ufo", UFO, "ufo " + (ufoLocked ? "locked" : ""));
+  document.getElementById("mode").textContent = state.beginnerCleared ? "Beginner · Hard unlocked" : "Beginner";
+  document.getElementById("progressText").textContent = `${state.done.length}/${FLOW.length} stages`;
+}
+
+/* ---------- modal ---------- */
+let current = null;
+function open(id) {
+  current = id;
+  const isUfo = id === "ufo";
+  const lm = isUfo ? UFO : LANDMARKS[id];
+  const idx = FLOW.indexOf(id);
+  const locked = isUfo ? !state.beginnerCleared : (idx > unlockedIndex() || state.done.includes(id) && false) || (idx > unlockedIndex());
+  const done = !isUfo && state.done.includes(id);
+  document.getElementById("mTitle").textContent = lm.name;
+  document.getElementById("mDesc").textContent = locked
+    ? (isUfo ? "Locked. Clear the Beginner run to unlock the UFO." : "Locked. Finish the earlier stages first.")
+    : (done ? "Already cleared." : lm.desc);
+  document.getElementById("mReward").textContent = lm.reward || "";
+  const go = document.getElementById("mGo");
+  go.disabled = locked || done;
+  go.textContent = done ? "Cleared" : (locked ? "Locked" : "Start");
+  go.onclick = () => complete(id);
+  document.getElementById("modal").classList.add("open");
+}
+function close() { document.getElementById("modal").classList.remove("open"); current = null; }
+document.getElementById("mClose").onclick = close;
+document.getElementById("modal").onclick = e => { if (e.target.id === "modal") close(); };
+
+/* Stand-in for a puzzle / battle. Replace complete() with the real game logic later. */
+function complete(id) {
+  if (id === "ufo") { toast("UFO is a placeholder for now."); close(); return; }
+  if (!state.done.includes(id)) state.done.push(id);
+  if (FLOW.every(k => state.done.includes(k))) state.beginnerCleared = true;
+  save(state);
+  close();
+  render();
+  toast(state.beginnerCleared ? "Run cleared. Hard mode and the UFO are unlocked." : "Stage cleared!");
+}
+
+/* ---------- misc ---------- */
+let tt;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2200);
+}
+document.getElementById("reset").onclick = () => {
+  if (!confirm("Reset your progress?")) return;
+  state = { done:[], beginnerCleared:false }; save(state); render(); toast("Progress reset.");
+};
+
+render();
+</script>
+</body>
+</html>
