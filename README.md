@@ -6,6 +6,8 @@ A playable prototype of the Halloween PVE map, so the flow can be seen and felt 
 
 ## What's in it
 - **Curved 3D world.** The map sits on a curved, planet-like surface with a tilted perspective camera. The camera gets lower as you zoom in. Fog, stars, 3D fireflies, and drifting mist add depth.
+- **Close-up locations.** Zoom in on (or click) a location and its close-up art (`locations/*.jpg`) fades into the curved ground, with a "Now exploring" title card. Covers Pumpkin Field, Graveyard, Sunken Pirate Ship, Science Laboratory, Boss Hall and the Wheat Fields.
+- **Navigation.** Drag to move (flick to glide), scroll/pinch to zoom toward the cursor, right-drag / Q·E / two-finger twist to rotate, WASD or arrows to fly, double-click to dive in. Camera flights between stops arc up and back down.
 - **Flow (four battles, one puzzle).** Battle 1 Pumpkin Field → Battle 2 Graveyard → Puzzle Sunken Pirate Ship → Battle 3 Science Laboratory → Boss Hall.
 - **Estate / Mansion tabs.** The Mansion stays sealed until the shipwreck puzzle is solved.
 - **Portrait pins and popover cards.** Each stop shows its opponent, reward, and first-try bonus, with a neon route that follows the painted roads.
@@ -21,7 +23,8 @@ Demo shortcuts in the browser console: `HE.skip()` clears the current stop, `HE.
 - `index.html` – the whole prototype. Stops, the flow, rewards, enemies, and road waypoints are config at the top of the script.
 - `map/map_master_4k.png` – 3840×2160 master, cropped to 16:9 from the original 6880×3840 artwork.
 - `map/map_web_2560.jpg` – 2560×1440 map used by the page.
-- `map/map_data.js` – the same map embedded as data, used only when the page is opened straight from disk (browsers block local images in WebGL).
+- `locations/*.jpg` – close-up art for each location; `LOCS` in `index.html` sets where each one sits on the map.
+- `map/map_data.js`, `locations/loc_data.js` – the same images embedded as data, used only when the page is opened straight from disk (browsers block local images in WebGL).
 - `vendor/three.min.js` – three.js r128 (MIT licence), bundled so there's no CDN dependency.
 - `tools/prep_map.py` – crop/export script and landmark-position calculation.
 

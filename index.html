@@ -173,6 +173,14 @@
     background:var(--panel2); border:1px solid var(--line); border-radius:4px; padding:10px 16px; font-size:14px; font-weight:600; max-width:min(92vw,520px); text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .toast.show { opacity:1; transform:translate(-50%,0); }
 
+  #area { position:fixed; top:84px; left:50%; transform:translate(-50%,-8px); z-index:19; text-align:center; pointer-events:none; opacity:0; transition:opacity .6s, transform .6s; text-shadow:0 2px 12px rgba(0,0,0,.85); }
+  #area.show { opacity:1; transform:translate(-50%,0); }
+  #area #areaK { color:var(--cyan); font-size:10px; display:flex; align-items:center; justify-content:center; gap:10px; }
+  #area #areaK::before, #area #areaK::after { content:""; width:28px; height:1px; background:linear-gradient(90deg, transparent, var(--cyan)); }
+  #area #areaK::after { transform:scaleX(-1); }
+  #area #areaN { font-family:var(--display); font-weight:900; font-size:clamp(22px,3vw,34px); text-transform:uppercase; letter-spacing:.03em; margin:4px 0 2px; }
+  #area #areaS { color:#c2cae4; font-size:10px; letter-spacing:.14em; }
+
   /* ---------- splash ---------- */
   #splash { position:fixed; inset:0; z-index:40; display:grid; place-items:center; padding:20px; background:radial-gradient(ellipse at 50% 50%, rgba(6,9,20,.15), rgba(6,9,20,.85) 75%); transition:opacity .8s; }
   #splash.hide { opacity:0; pointer-events:none; }
@@ -200,7 +208,8 @@
 
   .fo { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr); gap:12px; }
   .art { min-height:430px; padding:22px; display:flex; flex-direction:column; justify-content:flex-end; overflow:hidden; }
-  .art .bg { position:absolute; inset:0; filter:brightness(.55) saturate(1.2); }
+  .art .bg { position:absolute; inset:0; filter:brightness(.62) saturate(1.15); transform:scale(1.04); animation: kenburns 18s ease-in-out infinite alternate; }
+  @keyframes kenburns { to { transform:scale(1.14) translate(-2%,-1%); } }
   .art .shade { position:absolute; inset:0; background:linear-gradient(180deg, rgba(6,9,20,0) 30%, rgba(6,9,20,.92) 80%); }
   .art .big { position:absolute; left:50%; top:36%; transform:translate(-50%,-50%); font-size:clamp(110px,16vw,190px); filter:drop-shadow(0 0 50px rgba(255,140,40,.55)); }
   .art .big span { display:inline-block; animation: float 3s ease-in-out infinite; }
@@ -253,7 +262,7 @@
   .bar.e i.fill { background:linear-gradient(90deg, #ff7a3c, var(--red)); }
   .bar.p i.fill { background:repeating-linear-gradient(90deg, var(--cyan) 0 14px, transparent 14px 16px); }
   .board { min-height:400px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; overflow:hidden; padding:20px; }
-  .board .bg { position:absolute; inset:0; filter:brightness(.4) saturate(1.3); }
+  .board .bg { position:absolute; inset:0; filter:brightness(.42) saturate(1.2); }
   .board .frame { position:absolute; inset:14px; border:1px solid rgba(255,255,255,.08); box-shadow:inset 0 0 60px rgba(0,0,0,.8); pointer-events:none; }
   .enemy { position:relative; font-size:clamp(90px,13vw,150px); line-height:1; animation: float 2.4s ease-in-out infinite; filter:drop-shadow(0 0 30px rgba(255,90,60,.5)); }
   .boss .enemy { filter:drop-shadow(0 0 44px rgba(139,108,255,.85)); }
@@ -383,6 +392,8 @@
 <div class="zoom">
   <button class="ibtn" id="zIn" aria-label="Zoom in">+</button>
   <button class="ibtn" id="zOut" aria-label="Zoom out">−</button>
+  <button class="ibtn" id="rotL" aria-label="Rotate left">⟲</button>
+  <button class="ibtn" id="rotR" aria-label="Rotate right">⟳</button>
   <button class="ibtn" id="zHome" aria-label="Find me">⌖</button>
 </div>
 
@@ -394,6 +405,7 @@
 
 <div id="sealed"><div><div class="k">Sealed</div><h2>The Mansion opens after<br>the shipwreck puzzle</h2><button class="k" id="backEstate">Back to the Estate</button></div></div>
 <div id="banner"><div class="b1" id="b1"></div><div class="b2 k" id="b2"></div></div>
+<div id="area"><div class="k" id="areaK">Now exploring</div><div id="areaN"></div><div class="k" id="areaS"></div></div>
 
 <div id="splash">
   <div class="box panel brk">
@@ -401,7 +413,7 @@
     <h1>NEON TIDE</h1>
     <p>Four battles, one puzzle. Fight through the Estate, unseal the Mansion, and take down the boss.</p>
     <div class="btns" id="splashBtns"></div>
-    <div class="note">🔊 Sound on for the full effect · Drag to move · Scroll or pinch to zoom</div>
+    <div class="note">🔊 Sound on · Drag to move (flick to glide) · Scroll or pinch to zoom · Right-drag or Q/E to rotate · WASD to fly · Double-click to dive into a place</div>
   </div>
 </div>
 
@@ -442,6 +454,18 @@ const FLOW = ["pumpkin", "graveyard", "ship", "lab", "boss"];
 const UFO  = { x:74.19, y:26.88 };
 const TOMB = { x:13.22, y:34.04 };
 const REGIONS = { estate:{ x:44, y:66, z:1.45 }, mansion:{ x:42, y:27, z:1.55 } };
+
+/* Close-up art for each location (locations/<key>.jpg). It fades in on the curved ground as you zoom in.
+   x / y = where the centre of the close-up sits on the map. LOC_W = its width in world units (map = 16). */
+const LOCS = {
+  pumpkin:   { x:19.77, y:58.23, name:"Pumpkin Field",      sub:"The Estate · Battle 1", stop:"pumpkin" },
+  graveyard: { x:38.6,  y:60.5,  name:"The Graveyard",      sub:"The Estate · Battle 2", stop:"graveyard" },
+  ship:      { x:71.17, y:70.77, name:"Sunken Pirate Ship", sub:"The Estate · Puzzle",   stop:"ship" },
+  lab:       { x:56.56, y:35.83, name:"Science Laboratory", sub:"The Mansion · Battle 3", stop:"lab" },
+  boss:      { x:27.84, y:12.5,  name:"The Boss Hall",      sub:"The Mansion · Boss",    stop:"boss" },
+  wheat:     { x:74.19, y:26.88, name:"The Wheat Fields",   sub:"Something hums beneath the crop circle…" },
+};
+const LOC_W = 3.6;
 
 const WAYPOINTS = {
   "entrance>pumpkin":  [[38.5,92],[40.5,85],[39,79],[34,75],[28,70],[23.5,64]],
@@ -589,6 +613,7 @@ const Sound = (() => {
     click()   { tone(620, { dur: .08, type: "square", vol: .05 }); tone(930, { dur: .07, vol: .05, when: .03 }); },
     hover()   { tone(1500, { dur: .035, vol: .02 }); },
     select()  { tone(880, { dur: .12, type: "triangle", vol: .08 }); tone(1320, { dur: .15, vol: .05, when: .05 }); },
+    area()    { noise({ dur: 1.2, vol: .06, freq: 400, to: 1800, type: "bandpass", q: 2, attack: .4 }); [659.25, 987.77, 1318.5].forEach((f, i) => tone(f, { dur: 1.4, type: "triangle", vol: .045, when: .15 + i * .14 })); },
     step()    { noise({ dur: .07, vol: .05, freq: rand(700, 1100), type: "bandpass", q: 2 }); },
     whoosh()  { noise({ dur: .7, vol: .14, freq: 250, to: 2600, type: "bandpass", q: 1.4, attack: .25 }); },
     unlock()  { [440, 554.37, 659.25, 880].forEach((f, i) => tone(f, { dur: .55, type: "triangle", vol: .12, when: i * .08 })); },
@@ -731,13 +756,16 @@ function curve(pts) {
 })();
 
 /* =====================================================================
-   3D WORLD — map on a curved planet surface, tilted perspective camera
+   3D WORLD — map on a curved planet surface, tilted perspective camera,
+   and close-up location art that fades in as you zoom into a location
    ===================================================================== */
 const World = (() => {
   const MW = 16, MH = 9, R = 15, NIGHT = 0x060914;
   const surfY = (x, z) => -(x * x + z * z) / (2 * R);
+  const toXZ = (xp, yp) => [(xp / 100 - .5) * MW, (yp / 100 - .5) * MH];
+  const smooth = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
   const ok = !!window.THREE && (() => { try { return !!document.createElement("canvas").getContext("webgl"); } catch { return false; } })();
-  const stub = { ok, flash() {}, flyTo: () => Promise.resolve(), setFollow() {}, zoomBy() {}, setMarkers() {}, routeDirty() {} };
+  const stub = { ok, flash() {}, flyTo: () => Promise.resolve(), dive: () => Promise.resolve(), setFollow() {}, zoomBy() {}, rotateBy() {}, setMarkers() {}, routeDirty() {}, onArea() {} };
   if (!ok) { $("#splash .box").insertAdjacentHTML("beforeend", `<p style="color:#ff9aa9;margin-top:14px">This prototype needs WebGL. Try a recent Chrome, Edge, Safari or Firefox.</p>`); return stub; }
 
   const canvas = $("#gl");
@@ -750,6 +778,11 @@ const World = (() => {
   const cam = new THREE.PerspectiveCamera(40, 1, .05, 300);
   const aniso = renderer.capabilities.getMaxAnisotropy();
 
+  // Opened straight from disk (file://)? Browsers block local images in WebGL, so load embedded copies instead.
+  const fileMode = location.protocol === "file:";
+  const loadScript = src => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+
+  /* ---------- curved terrain + base map ---------- */
   const geo = new THREE.PlaneGeometry(MW, MH, 200, 112);
   geo.rotateX(-Math.PI / 2);
   const pa = geo.attributes.position;
@@ -767,21 +800,49 @@ const World = (() => {
     edge(0, 0, e, 0, 0, 0, e, 1440); edge(2560, 0, 2560 - e, 0, 2560 - e, 0, e, 1440);
     mapTex.needsUpdate = true;
   };
-  // Opened straight from disk (file://)? Browsers block local images in WebGL, so load an embedded copy instead.
-  if (location.protocol === "file:") {
-    const s = document.createElement("script"); s.src = "map/map_data.js";
-    s.onload = () => { img.src = window.MAP_DATA_URL; }; s.onerror = () => { img.src = MAP_SRC; };
-    document.head.appendChild(s);
-  } else img.src = MAP_SRC;
+  if (fileMode) loadScript("map/map_data.js").then(() => img.src = window.MAP_DATA_URL).catch(() => img.src = MAP_SRC);
+  else img.src = MAP_SRC;
   const mapMat = new THREE.MeshBasicMaterial({ map: mapTex });
   const mapMesh = new THREE.Mesh(geo, mapMat);
   scene.add(mapMesh);
 
+  /* ---------- close-up location art, laid on the curved ground ---------- */
+  const details = [];
+  const locData = fileMode ? loadScript("locations/loc_data.js").catch(() => {}) : Promise.resolve();
+  function patchGeo(cx, cz, w, h) {
+    const g = new THREE.PlaneGeometry(w, h, 56, 32); g.rotateX(-Math.PI / 2);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i) + cx, z = p.getZ(i) + cz; p.setXYZ(i, x, surfY(x, z) + .003, z); }
+    return g;
+  }
+  Object.entries(LOCS).forEach(([key, L]) => {
+    const [cx, cz] = toXZ(L.x, L.y), w = LOC_W, h = LOC_W * 1143 / 2048;
+    const c = document.createElement("canvas"); c.width = 2048; c.height = 1143;
+    const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = aniso;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const mesh = new THREE.Mesh(patchGeo(cx, cz, w, h), mat); mesh.renderOrder = 1; mesh.visible = false; scene.add(mesh);
+    const d = { key, cx, cz, mat, mesh, o: 0, ready: false };
+    details.push(d);
+    const im = new Image();
+    im.onload = () => {
+      const g = c.getContext("2d"); g.drawImage(im, 0, 0, c.width, c.height);
+      // feather the edges so the close-up melts into the map around it
+      g.globalCompositeOperation = "destination-in";
+      g.save(); g.translate(c.width / 2, c.height / 2); g.scale(1, c.height / c.width);
+      const gr = g.createRadialGradient(0, 0, c.width * .3, 0, 0, c.width * .5);
+      gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr; g.fillRect(-c.width / 2, -c.width / 2, c.width, c.width); g.restore();
+      tex.needsUpdate = true; d.ready = true;
+    };
+    locData.then(() => { im.src = (fileMode && window.LOC_DATA && window.LOC_DATA[key]) || `locations/${key}.jpg`; });
+  });
+
+  /* ---------- neon route overlay ---------- */
   const rc = document.createElement("canvas"); rc.width = 2048; rc.height = 1152;
   const rg = rc.getContext("2d");
   const routeTex = new THREE.CanvasTexture(rc); routeTex.encoding = THREE.sRGBEncoding; routeTex.anisotropy = aniso;
   const routeMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: routeTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
-  routeMesh.renderOrder = 1; scene.add(routeMesh);
+  routeMesh.renderOrder = 2; scene.add(routeMesh);
   let routeDirty = true;
   function drawRoute() {
     rg.clearRect(0, 0, rc.width, rc.height);
@@ -789,20 +850,21 @@ const World = (() => {
     const stroke = pts => { rg.beginPath(); pts.forEach(([x, y], i) => i ? rg.lineTo(x * sx, y * sy) : rg.moveTo(x * sx, y * sy)); rg.stroke(); };
     rg.lineCap = "round"; rg.lineJoin = "round";
     for (const l of legs) {
-      rg.setLineDash([10, 12]); rg.lineWidth = 4; rg.strokeStyle = "rgba(120,200,220,.38)"; stroke(l.full);
+      rg.setLineDash([8, 10]); rg.lineWidth = 2.5; rg.strokeStyle = "rgba(120,200,220,.4)"; stroke(l.full);
       if (l.lit > 0) {
         const n = Math.max(2, Math.ceil(120 * l.lit)), pts = [];
         for (let k = 0; k <= n; k++) { const p = l.el.getPointAtLength(l.len * l.lit * k / n); pts.push([p.x, p.y]); }
         rg.setLineDash([]);
-        rg.strokeStyle = "rgba(63,240,220,.12)"; rg.lineWidth = 30; stroke(pts);
-        rg.strokeStyle = "rgba(63,240,220,.28)"; rg.lineWidth = 17; stroke(pts);
-        rg.strokeStyle = "rgba(63,240,220,.85)"; rg.lineWidth = 9; stroke(pts);
-        rg.strokeStyle = "#e6fffb"; rg.lineWidth = 3.5; stroke(pts);
+        rg.strokeStyle = "rgba(63,240,220,.12)"; rg.lineWidth = 16; stroke(pts);
+        rg.strokeStyle = "rgba(63,240,220,.3)"; rg.lineWidth = 9; stroke(pts);
+        rg.strokeStyle = "rgba(63,240,220,.9)"; rg.lineWidth = 4.5; stroke(pts);
+        rg.strokeStyle = "#e6fffb"; rg.lineWidth = 1.8; stroke(pts);
       }
     }
     routeTex.needsUpdate = true;
   }
 
+  /* ---------- sky, fireflies, mist ---------- */
   const starGeo = new THREE.BufferGeometry(), sp = [];
   for (let i = 0; i < 1600; i++) { const th = rand(0, Math.PI * 2), ph = rand(.02, 1.3), r = 90; sp.push(r * Math.cos(th) * Math.cos(ph), r * Math.sin(ph) - 6, r * Math.sin(th) * Math.cos(ph)); }
   starGeo.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
@@ -820,77 +882,114 @@ const World = (() => {
   wispGeo.setAttribute("position", new THREE.BufferAttribute(wp, 3));
   wispGeo.setAttribute("color", new THREE.BufferAttribute(wc, 3));
   const wispMat = new THREE.PointsMaterial({ map: dotTex, vertexColors: true, size: .09, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-  scene.add(new THREE.Points(wispGeo, wispMat));
+  const wispPts = new THREE.Points(wispGeo, wispMat); wispPts.renderOrder = 3; scene.add(wispPts);
 
   const mist = [];
   const mistTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d"), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128); gr.addColorStop(0, "rgba(170,190,240,.5)"); gr.addColorStop(1, "rgba(170,190,240,0)"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); return new THREE.CanvasTexture(c); })();
   for (let i = 0; i < 14; i++) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: mistTex, transparent: true, depthWrite: false, opacity: rand(.15, .3) }));
-    const s = rand(2.5, 5); m.scale.set(s, s * .55, 1);
-    mist.push({ m, x: rand(-MW / 2, MW / 2), z: rand(-MH / 2, MH / 2), h: rand(.25, .7), v: rand(.08, .2) * (Math.random() < .5 ? -1 : 1) });
+    const base = rand(.15, .3);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: mistTex, transparent: true, depthWrite: false, opacity: base }));
+    const s = rand(2.5, 5); m.scale.set(s, s * .55, 1); m.renderOrder = 4;
+    mist.push({ m, base, x: rand(-MW / 2, MW / 2), z: rand(-MH / 2, MH / 2), h: rand(.25, .7), v: rand(.08, .2) * (Math.random() < .5 ? -1 : 1) });
     scene.add(m);
   }
 
-  const DMIN = 2.1; let DMAX = 12;
-  const C = { tx: 0, tz: 0, d: 12 };
-  let tween = null, followFn = null;
-  const toXZ = (xp, yp) => [(xp / 100 - .5) * MW, (yp / 100 - .5) * MH];
+  /* ---------- camera ---------- */
+  const DMIN = 1.45, DIVE_D = 2.25, YAW_MAX = .75; let DMAX = 12;
+  const C = { tx: 0, tz: 0, d: 12, yaw: 0 };
+  let dTarget = 12, zoomAnchor = null, tween = null, followFn = null;
+  const vel = { x: 0, z: 0 }; let yawVel = 0, dragging = false, lastMove = 0;
+  const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
   function fitMax() { const a = innerWidth / innerHeight, t = Math.tan(cam.fov * Math.PI / 360); DMAX = Math.max(6, Math.min(14, Math.min(MW / (2 * t * a), MH * 1.25 / (2 * t)))); }
+  const clampD = d => Math.max(DMIN, Math.min(DMAX, d));
   const tZoom = d => (d - DMIN) / (DMAX - DMIN);
-  const elev = d => (34 + 30 * tZoom(d)) * Math.PI / 180;
+  const elev = d => (30 + 34 * tZoom(d)) * Math.PI / 180;          // low, cinematic angle when zoomed in
   function clampC(c) {
-    c.d = Math.max(DMIN, Math.min(DMAX, c.d));
+    c.d = clampD(c.d);
     const k = 1 - tZoom(c.d) * .85, mx = MW / 2 * .86 * k, mz = MH / 2 * .86 * k;
     c.tx = Math.max(-mx, Math.min(mx, c.tx)); c.tz = Math.max(-mz, Math.min(mz + .4, c.tz));
+    c.yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, c.yaw));
     return c;
   }
-  const zoomToD = z => Math.max(DMIN, Math.min(DMAX, DMAX / z));
-  function flyTo(xp, yp, z, dur = 1400) {
-    followFn = null;
-    const [tx, tz] = toXZ(xp, yp);
-    return new Promise(res => { if (tween) tween.res(); tween = { a: { ...C }, b: clampC({ tx, tz, d: zoomToD(z) }), t0: performance.now(), dur, res }; });
+  const zoomToD = z => clampD(DMAX / z);
+  function stopAuto() { if (tween) { tween.res(); tween = null; } followFn = null; }
+  function startTween(b, dur) {
+    return new Promise(res => {
+      stopAuto(); vel.x = vel.z = 0; yawVel = 0; zoomAnchor = null;
+      const a = { ...C }; b = clampC({ yaw: C.yaw, ...b });
+      const dist = Math.hypot(b.tx - a.tx, b.tz - a.tz);
+      // long flights arc up and back down, like a camera crane
+      tween = { a, b, t0: performance.now(), dur: dur || Math.min(2400, 900 + dist * 200), bump: Math.min(3.5, dist * .45), res };
+    });
   }
-  function setFollow(fn, z) { if (tween) { tween.res(); tween = null; } followFn = fn ? { fn, d: zoomToD(z || 2) } : null; }
+  function flyTo(xp, yp, z, dur) { const [tx, tz] = toXZ(xp, yp); return startTween({ tx, tz, d: zoomToD(z) }, dur); }
+  function dive(xp, yp, dur, opts = {}) { const [tx, tz] = toXZ(xp, yp); return startTween({ tx, tz, d: DIVE_D, ...opts }, dur); }
+  function setFollow(fn, z) { if (!fn) { followFn = null; return; } stopAuto(); followFn = { fn, d: zoomToD(z || 2) }; }
   function placeCamera(t) {
-    const yaw = reduceMotion ? 0 : Math.sin(t * .0001) * .03;
-    const el = elev(C.d), ty = surfY(C.tx, C.tz);
+    const sway = reduceMotion ? 0 : Math.sin(t * .0001) * .03;
+    mouse.sx += (mouse.x - mouse.sx) * .05; mouse.sy += (mouse.y - mouse.sy) * .05;   // gentle look-around with the mouse
+    const yaw = C.yaw + sway + mouse.sx * .035, el = elev(C.d) + mouse.sy * .025, ty = surfY(C.tx, C.tz);
     cam.position.set(C.tx + Math.sin(yaw) * C.d * Math.cos(el), ty + C.d * Math.sin(el), C.tz + Math.cos(yaw) * C.d * Math.cos(el));
     cam.lookAt(C.tx, ty, C.tz);
   }
 
+  /* ---------- input: drag (with glide), right-drag/Q/E rotate, wheel/pinch zoom, double-click dive, WASD ---------- */
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pickAt(cx, cy) { ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); const h = ray.intersectObject(mapMesh)[0]; return h ? h.point : null; }
-  function stopAuto() { if (tween) { tween.res(); tween = null; } followFn = null; }
-  function zoomAt(cx, cy, factor) {
-    stopAuto();
-    const nd = Math.max(DMIN, Math.min(DMAX, C.d / factor)), p = pickAt(cx, cy), k = 1 - nd / C.d;
-    if (p) { C.tx += (p.x - C.tx) * k; C.tz += (p.z - C.tz) * k; }
-    C.d = nd; clampC(C);
+  function screenDelta(dx, dy) {
+    const wpp = 2 * C.d * Math.tan(cam.fov * Math.PI / 360) / innerHeight, k = 1 / Math.sin(elev(C.d)), s = Math.sin(C.yaw), c = Math.cos(C.yaw);
+    return { x: -(c * dx * wpp + s * dy * wpp * k), z: -(-s * dx * wpp + c * dy * wpp * k) };
   }
-  function pan(dx, dy) {
+  function zoomTo(cx, cy, nd, instant) {
     stopAuto();
-    const wpp = 2 * C.d * Math.tan(cam.fov * Math.PI / 360) / innerHeight;
-    C.tx -= dx * wpp; C.tz -= dy * wpp / Math.sin(elev(C.d)); clampC(C);
+    const p = pickAt(cx, cy);
+    if (instant) { nd = clampD(nd); const k = 1 - nd / C.d; if (p) { C.tx += (p.x - C.tx) * k; C.tz += (p.z - C.tz) * k; } C.d = nd; dTarget = nd; clampC(C); }
+    else { dTarget = clampD(nd); zoomAnchor = p; }
   }
-  canvas.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
-  const ptrs = new Map(); let pinchD = null;
-  canvas.addEventListener("pointerdown", e => { ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY }); });
+  const inUI = () => $("#scene").classList.contains("open") || !$("#splash").classList.contains("hide");
+  canvas.addEventListener("wheel", e => { e.preventDefault(); zoomTo(e.clientX, e.clientY, dTarget * (e.deltaY < 0 ? 1 / 1.18 : 1.18)); }, { passive: false });
+  canvas.addEventListener("dblclick", e => { zoomTo(e.clientX, e.clientY, Math.max(DMIN, Math.min(DIVE_D, C.d / 2.4))); sfx("whoosh"); });
+  canvas.addEventListener("contextmenu", e => e.preventDefault());
+  const ptrs = new Map(); let pinchD = null, pinchA = null;
+  canvas.addEventListener("pointerdown", e => {
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, rot: e.button === 2 || e.shiftKey });
+    dragging = true; vel.x = vel.z = 0; yawVel = 0;
+  });
   addEventListener("pointermove", e => {
+    if (e.pointerType === "mouse") { mouse.x = e.clientX / innerWidth * 2 - 1; mouse.y = e.clientY / innerHeight * 2 - 1; }
     const p = ptrs.get(e.pointerId); if (!p) return;
     const px = p.x, py = p.y; p.x = e.clientX; p.y = e.clientY;
     if (ptrs.size === 1) {
       if (Math.hypot(p.x - p.sx, p.y - p.sy) > 6) { window.dragMoved = true; canvas.classList.add("dragging"); }
-      if (window.dragMoved) pan(p.x - px, p.y - py);
+      if (!window.dragMoved) return;
+      stopAuto();
+      if (p.rot) { const dy = (p.x - px) * .006; C.yaw += dy; yawVel = dy * .6; clampC(C); }
+      else { const d = screenDelta(p.x - px, p.y - py); C.tx += d.x; C.tz += d.z; clampC(C); vel.x = lerp(vel.x, d.x, .5); vel.z = lerp(vel.z, d.z, .5); }
+      lastMove = performance.now();
     } else if (ptrs.size === 2) {
       window.dragMoved = true;
-      const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchD) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchD);
-      pinchD = d;
+      const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(b.y - a.y, b.x - a.x);
+      if (pinchD) zoomTo((a.x + b.x) / 2, (a.y + b.y) / 2, C.d * pinchD / d, true);
+      if (pinchA != null) { let da = ang - pinchA; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; C.yaw -= da; clampC(C); }
+      pinchD = d; pinchA = ang;
     }
   });
-  const endP = e => { if (!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinchD = null; if (!ptrs.size) { canvas.classList.remove("dragging"); setTimeout(() => window.dragMoved = false, 0); } };
+  const endP = e => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId); if (ptrs.size < 2) { pinchD = null; pinchA = null; }
+    if (!ptrs.size) {
+      dragging = false; canvas.classList.remove("dragging");
+      if (performance.now() - lastMove > 90) { vel.x = vel.z = 0; yawVel = 0; }   // only glide if released mid-swipe
+      setTimeout(() => window.dragMoved = false, 0);
+    }
+  };
   addEventListener("pointerup", endP); addEventListener("pointercancel", endP);
+  const keys = new Set();
+  addEventListener("keydown", e => { if (inUI() || e.metaKey || e.ctrlKey) return; const k = e.key.toLowerCase(); if (["w", "a", "s", "d", "q", "e", "arrowup", "arrowdown", "arrowleft", "arrowright", "+", "=", "-", "_"].includes(k)) { keys.add(k); if (k.startsWith("arrow")) e.preventDefault(); } });
+  addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+  addEventListener("blur", () => keys.clear());
 
+  /* ---------- DOM markers projected onto the curved ground ---------- */
   const v3 = new THREE.Vector3();
   function project(xp, yp) {
     const [x, z] = toXZ(xp, yp);
@@ -904,14 +1003,14 @@ const World = (() => {
     for (const m of markers) {
       const p = m.pos(); if (!p) { m.el.style.visibility = "hidden"; continue; }
       const q = project(p.x, p.y);
-      if (!q.on) { m.el.style.visibility = "hidden"; continue; }
+      if (!q.on || q.x < -200 || q.x > innerWidth + 200 || q.y < -200 || q.y > innerHeight + 200) { m.el.style.visibility = "hidden"; continue; }
       m.el.style.visibility = "";
       if (m.anchor === "pop") {
         if (innerWidth <= 640) { m.el.style.transform = ""; continue; }
         const w = m.el.offsetWidth, h = m.el.offsetHeight;
-        let x = q.x + 54, y = q.y - h - 30;
-        if (x + w > innerWidth - 16) x = q.x - w - 54;
-        y = Math.max(100, Math.min(innerHeight - h - 96, y));
+        let x = q.x + 60, y = q.y - h - 40;
+        if (x + w > innerWidth - 16) x = q.x - w - 60;
+        x = Math.max(16, x); y = Math.max(100, Math.min(innerHeight - h - 96, y));
         m.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`;
         continue;
       }
@@ -921,22 +1020,63 @@ const World = (() => {
     }
   }
 
-  let flashT = -1;
+  let flashT = -1, areaCb = null, curArea = null, lastT = 0;
   function flash() { flashT = performance.now(); }
-  function resize() { renderer.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); fitMax(); clampC(C); }
+  function resize() { renderer.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); fitMax(); clampC(C); dTarget = clampD(dTarget); }
   resize(); addEventListener("resize", resize);
-  C.d = DMAX;
+  C.d = dTarget = DMAX;
 
   function frame(t) {
+    const dt = Math.min(.1, (t - (lastT || t)) / 1000); lastT = t;
+    const fadeK = 1 - Math.pow(.9, dt * 60);
     if (tween) {
       const k = Math.min(1, (t - tween.t0) / tween.dur), e = ease(k), { a, b } = tween;
-      C.tx = lerp(a.tx, b.tx, e); C.tz = lerp(a.tz, b.tz, e); C.d = lerp(a.d, b.d, e);
+      C.tx = lerp(a.tx, b.tx, e); C.tz = lerp(a.tz, b.tz, e); C.yaw = lerp(a.yaw, b.yaw, e);
+      C.d = Math.min(DMAX, lerp(a.d, b.d, e) + tween.bump * Math.sin(Math.PI * e));
+      dTarget = C.d;
       if (k >= 1) { const r = tween.res; tween = null; r(); }
     } else if (followFn) {
       const p = followFn.fn(), [tx, tz] = toXZ(p.x, p.y);
-      C.tx = lerp(C.tx, tx, .07); C.tz = lerp(C.tz, tz, .07); C.d = lerp(C.d, followFn.d, .04); clampC(C);
+      C.tx = lerp(C.tx, tx, .07); C.tz = lerp(C.tz, tz, .07); C.d = lerp(C.d, followFn.d, .04); clampC(C); dTarget = C.d;
+    } else {
+      // free camera: glide, smooth zoom toward the cursor, keyboard flying
+      if (!dragging && (Math.abs(vel.x) + Math.abs(vel.z) > 1e-4)) { C.tx += vel.x; C.tz += vel.z; vel.x *= .92; vel.z *= .92; }
+      if (!dragging && Math.abs(yawVel) > 1e-4) { C.yaw += yawVel; yawVel *= .9; }
+      if (keys.size && !inUI()) {
+        const f60 = dt * 60, sp = C.d * .012 * f60, s = Math.sin(C.yaw), c = Math.cos(C.yaw);
+        let fx = 0, fz = 0;
+        if (keys.has("w") || keys.has("arrowup")) { fx -= s; fz -= c; }
+        if (keys.has("s") || keys.has("arrowdown")) { fx += s; fz += c; }
+        if (keys.has("a") || keys.has("arrowleft")) { fx -= c; fz += s; }
+        if (keys.has("d") || keys.has("arrowright")) { fx += c; fz -= s; }
+        vel.x = lerp(vel.x, fx * sp, .2); vel.z = lerp(vel.z, fz * sp, .2);
+        if (fx || fz) { C.tx += vel.x; C.tz += vel.z; }
+        if (keys.has("q")) C.yaw -= .02 * f60;
+        if (keys.has("e")) C.yaw += .02 * f60;
+        if (keys.has("+") || keys.has("=")) { dTarget = clampD(dTarget * .975); zoomAnchor = null; }
+        if (keys.has("-") || keys.has("_")) { dTarget = clampD(dTarget * 1.025); zoomAnchor = null; }
+      }
+      if (Math.abs(C.d - dTarget) > .002) {
+        const nd = lerp(C.d, dTarget, .16);
+        if (zoomAnchor) { const k = 1 - nd / C.d; C.tx += (zoomAnchor.x - C.tx) * k; C.tz += (zoomAnchor.z - C.tz) * k; }
+        C.d = nd;
+      } else zoomAnchor = null;
+      clampC(C);
     }
     placeCamera(t);
+
+    // close-up art: fades in when the camera is low and centred on a location
+    const zf = smooth((5 - C.d) / 2);
+    let best = null;
+    for (const d of details) {
+      const dist = Math.hypot(C.tx - d.cx, C.tz - d.cz);
+      const tgt = d.ready ? zf * (1 - smooth((dist - .55) / 1.2)) : 0;
+      d.o += (tgt - d.o) * fadeK; d.mat.opacity = d.o; d.mesh.visible = d.o > .01;
+      if (!best || d.o > best.o) best = d;
+    }
+    if (best && best.o > .55 && best.key !== curArea) { curArea = best.key; areaCb && areaCb(curArea); }
+    else if (curArea && (!best || best.o < .15)) { curArea = null; areaCb && areaCb(null); }
+
     const tt = t / 1000;
     for (let i = 0; i < WN; i++) {
       const w = wisps[i], x = w.x + Math.sin(tt * w.sp * .5 + w.ph) * w.dr * 3, z = w.z + Math.cos(tt * w.sp * .4 + w.ph) * w.dr * 2;
@@ -944,13 +1084,15 @@ const World = (() => {
     }
     wispGeo.attributes.position.needsUpdate = true;
     wispMat.opacity = .7 + Math.sin(tt * 3) * .15;
+    const mistK = .25 + .75 * tZoom(C.d);
     for (const m of mist) {
       m.x += m.v * .01; if (m.x > MW / 2 + 2) m.x = -MW / 2 - 2; if (m.x < -MW / 2 - 2) m.x = MW / 2 + 2;
-      m.m.position.set(m.x, surfY(m.x, m.z) + m.h, m.z); m.m.quaternion.copy(cam.quaternion);
+      m.m.position.set(m.x, surfY(m.x, m.z) + m.h, m.z); m.m.quaternion.copy(cam.quaternion); m.m.material.opacity = m.base * mistK;
     }
     if (flashT > 0) {
-      const k = (t - flashT) / 900, b = k < .05 ? 1 : k < .12 ? .2 : k < .2 ? .7 : Math.max(0, 1 - k);
-      mapMat.color.setScalar(1 + b * .9); if (k > 1.2) { flashT = -1; mapMat.color.setScalar(1); }
+      const k = (t - flashT) / 900, b = k < .05 ? 1 : k < .12 ? .2 : k < .2 ? .7 : Math.max(0, 1 - k), v = 1 + b * .9;
+      mapMat.color.setScalar(v); details.forEach(d => d.mat.color.setScalar(v));
+      if (k > 1.2) { flashT = -1; mapMat.color.setScalar(1); details.forEach(d => d.mat.color.setScalar(1)); }
     }
     if (routeDirty) { drawRoute(); routeDirty = false; }
     renderer.render(scene, cam);
@@ -958,7 +1100,14 @@ const World = (() => {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  return { ok, flyTo, setFollow, zoomBy: f => zoomAt(innerWidth / 2, innerHeight / 2, f), setMarkers: l => markers = l, flash, routeDirty: () => routeDirty = true };
+  return {
+    ok, flyTo, dive, setFollow, flash,
+    zoomBy: f => zoomTo(innerWidth / 2, innerHeight / 2, dTarget / f),
+    rotateBy: a => { stopAuto(); yawVel += a; },
+    setMarkers: l => markers = l,
+    routeDirty: () => routeDirty = true,
+    onArea: cb => areaCb = cb,
+  };
 })();
 window.dragMoved = false;
 function lightLeg(i, frac) { if (legs[i]) { legs[i].lit = frac; World.routeDirty(); } }
@@ -1028,7 +1177,7 @@ function select(k, fly) {
   selected = k; sfx("select");
   if (lm.region !== region) setRegion(lm.region, false);
   renderPins(); renderPop();
-  if (fly) World.flyTo(lm.x, lm.y + 3, focusZ(), 900);
+  if (fly) World.dive(lm.x, lm.y);
 }
 
 function setRegion(r, fly = true) {
@@ -1064,6 +1213,18 @@ function renderTop() {
   document.querySelectorAll("#diff button").forEach(b => { b.classList.toggle("on", b.dataset.m === S.mode); b.disabled = b.dataset.m === "hard" && !S.beginnerCleared; });
 }
 function renderAll() { renderPins(); renderPop(); renderTrack(); renderTop(); }
+let areaT;
+World.onArea(key => {
+  const a = $("#area");
+  clearTimeout(areaT);
+  if (!key) { a.classList.remove("show"); return; }
+  const L = LOCS[key], sealed = L.stop && LM[L.stop].region === "mansion" && !mansionOpen();
+  $("#areaN").textContent = L.name;
+  $("#areaS").textContent = key === "wheat" && S.beginnerCleared ? "The Visitors have landed" : sealed ? "Sealed until the shipwreck puzzle" : L.sub;
+  a.classList.remove("show"); void a.offsetWidth; a.classList.add("show");
+  sfx("area");
+  areaT = setTimeout(() => a.classList.remove("show"), 3200);
+});
 function addCandy(n, fromEl) {
   S.candy += n; S.run += n; save(); renderTop();
   document.querySelectorAll(".candy").forEach(c => { c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump"); });
@@ -1074,7 +1235,9 @@ $("#soundBtn").onclick = () => { Sound.init(); Sound.setMuted(!S.muted); renderT
 $("#menuBtn").onclick = () => { if (!busy) showSplash(); };
 $("#zIn").onclick = () => World.zoomBy(1.3);
 $("#zOut").onclick = () => World.zoomBy(1 / 1.3);
-$("#zHome").onclick = () => World.flyTo(ppos.x, ppos.y + 3, focusZ(), 900);
+$("#zHome").onclick = () => World.dive(ppos.x, ppos.y, null, { yaw: 0 });
+$("#rotL").onclick = () => World.rotateBy(-.045);
+$("#rotR").onclick = () => World.rotateBy(.045);
 $("#restartBtn").onclick = () => { if (!busy) startRun(S.mode, true); };
 document.querySelectorAll("#diff button").forEach(b => b.onclick = () => {
   if (busy || b.disabled || b.dataset.m === S.mode) return;
@@ -1090,6 +1253,7 @@ const addCleanup = f => cleanups.push(f);
 function runCleanups() { cleanups.forEach(f => { try { f(); } catch (e) {} }); cleanups = []; Sound.battle(false); $("#scene").classList.remove("enraged"); }
 const body = () => $("#sceneBody");
 let sceneLocked = false;
+function locBg(el, k) { if (!el) return; el.style.backgroundImage = `url("locations/${k}.jpg")`; el.style.backgroundSize = "cover"; el.style.backgroundPosition = "center"; }
 function cropStyle(t, el, Z = 3) {
   if (!el) return;
   const r = el.getBoundingClientRect(), w = r.width || 400, h = r.height || 300;
@@ -1132,7 +1296,7 @@ function openFaceOff(k) {
       <button class="cta" id="faceOff">${puzzle ? "Start puzzle" : "Face off"}</button>
       <button class="cta ghost" id="toMap">Map</button>
     </div></div>`;
-  requestAnimationFrame(() => { cropStyle(lm, $("#artBg"), 3.2); cropStyle(lm, $("#miniBg"), 4); });
+  locBg($("#artBg"), k); locBg($("#miniBg"), k);
   $("#faceOff").onclick = () => puzzle ? startGame(k) : matchIntro(k);
   $("#toMap").onclick = closeScene;
   if (lm.kind === "boss") sfx("charge");
@@ -1231,7 +1395,7 @@ function gameBattle(k) {
       <div class="sec k">Your spells</div>
       <div class="acts">${MY_SPELLS.map((s, i) => `<button class="act" data-a="${s.a}"><span class="ai">${s.i}</span><b>${s.n}</b><small id="d_${s.a}"></small></button>`).join("")}</div>
     </div></div>`;
-  requestAnimationFrame(() => cropStyle(lm, $("#boardBg"), 3.4));
+  locBg($("#boardBg"), k);
   const enemyEl = $("#enemy"), pSide = $("#pSide"), log = m => $("#log").innerHTML = m;
   function upd() {
     $("#eHp").style.width = $("#eLag").style.width = (E.hp / E.max * 100) + "%";
@@ -1359,7 +1523,7 @@ async function complete(k) {
   const pinEl = document.querySelector(`.pin[data-id="${FLOW[nx]}"] .pf`);
   sfx("unlock"); burstAt(pinEl, { n: 40, speed: 5 });
   busy = false;
-  select(FLOW[nx], false);
+  select(FLOW[nx], true);
 }
 
 function travel(i) {
@@ -1466,7 +1630,7 @@ async function startRun(mode, fresh) {
     await World.flyTo(ppos.x, ppos.y + 3, focusZ(), 1600);
   }
   busy = false;
-  if (nextIndex() < FLOW.length) select(FLOW[nextIndex()], false); else renderAll();
+  if (nextIndex() < FLOW.length) select(FLOW[nextIndex()], true); else renderAll();
 }
 
 /* boot */
