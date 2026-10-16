@@ -8,16 +8,19 @@
   :root { --accent:#ff7a1a; --glow:#7ff3ff; --panel:rgba(10,8,24,.92); --text:#f4efff; --muted:#a79fc4; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; background:#050510; color:var(--text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; touch-action:none; }
 
   /* Cover-fit a 16:9 stage to any screen, matching the crop rules in the spec */
   .stage { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    width:max(100vw, 100vh * 16 / 9); height:max(100vh, 100vw * 9 / 16); }
-  .stage img.bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; user-select:none; pointer-events:none; }
-  .path { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-  .path polyline { fill:none; stroke:rgba(255,190,90,.85); stroke-width:.35; stroke-dasharray:1 .8; stroke-linecap:round; filter:drop-shadow(0 0 .4px #000); }
+    width:max(100vw, 100vh * 16 / 9); height:max(100vh, 100vw * 9 / 16); overflow:hidden; cursor:grab; }
+  .stage.dragging { cursor:grabbing; }
+  /* Everything on the map lives in #world, which is zoomed and panned as one */
+  #world { position:absolute; inset:0; transform-origin:0 0; will-change:transform; }
+  #world img.bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; user-select:none; pointer-events:none; -webkit-user-drag:none; }
+  .path { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+  .path path { fill:none; stroke:rgba(255,190,90,.85); stroke-width:2.5px; stroke-dasharray:10 8; stroke-linecap:round; filter:drop-shadow(0 0 .4px #000); vector-effect:non-scaling-stroke; }
 
-  .pin { position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:4px;
+  .pin { position:absolute; transform:translate(-50%,-50%) scale(var(--pin-scale,1)); display:flex; flex-direction:column; align-items:center; gap:4px;
     background:none; border:0; color:var(--text); cursor:pointer; font:inherit; }
   .pin .dot { width:22px; height:22px; border-radius:50%; background:var(--accent); border:3px solid #fff;
     box-shadow:0 0 0 0 rgba(255,122,26,.7); animation: pulse 2s infinite; }
@@ -32,8 +35,12 @@
 
   header { position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; align-items:center; gap:12px; z-index:5; pointer-events:none; }
   .title { background:var(--panel); padding:8px 14px; border-radius:10px; font-weight:800; letter-spacing:.5px; }
-  .progress { background:var(--panel); padding:8px 14px; border-radius:10px; font-size:14px; color:var(--muted); }
-  .reset { pointer-events:auto; background:none; border:1px solid #444; color:var(--muted); border-radius:8px; padding:4px 8px; cursor:pointer; font:inherit; font-size:12px; margin-left:8px; }
+  .progress { background:var(--panel); padding:8px 14px; border-radius:10px; font-size:14px; color:var(--muted); pointer-events:auto; }
+  .reset { background:none; border:1px solid #444; color:var(--muted); border-radius:8px; padding:4px 8px; cursor:pointer; font:inherit; font-size:12px; margin-left:8px; }
+
+  .zoom { position:fixed; right:12px; bottom:14px; display:flex; flex-direction:column; gap:6px; z-index:5; }
+  .zoom button { width:40px; height:40px; border-radius:10px; border:1px solid #3a3360; background:var(--panel); color:var(--text);
+    font:inherit; font-size:20px; font-weight:700; cursor:pointer; }
 
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:10; padding:16px; }
   .modal.open { display:flex; }
@@ -59,15 +66,23 @@
 <body>
 
 <div class="stage" id="stage">
-  <img class="bg" src="map/map_web_2560.jpg" alt="Halloween map">
-  <svg class="path" viewBox="0 0 100 100" preserveAspectRatio="none" id="path"></svg>
-  <div id="pins"></div>
+  <div id="world">
+    <img class="bg" src="map/map_web_2560.jpg" alt="Halloween map" draggable="false">
+    <svg class="path" viewBox="0 0 100 100" preserveAspectRatio="none" id="path"></svg>
+    <div id="pins"></div>
+  </div>
 </div>
 
 <header>
   <div class="title">🎃 Halloween Adventure <span style="color:var(--muted);font-weight:500">· <span id="mode">Beginner</span></span></div>
   <div class="progress"><span id="progressText"></span><button class="reset" id="reset">reset</button></div>
 </header>
+
+<div class="zoom">
+  <button id="zIn" aria-label="Zoom in">+</button>
+  <button id="zOut" aria-label="Zoom out">−</button>
+  <button id="zReset" aria-label="Reset view">⟲</button>
+</div>
 
 <div class="modal" id="modal">
   <div class="card">
@@ -87,7 +102,6 @@
 /* ------------------------------------------------------------------
    LANDMARKS: x / y are % of the 16:9 map (0,0 = top-left).
    FLOW: the linear run. Order here = order the path is walked.
-   Change order or add steps here; the path line and pins follow.
    ------------------------------------------------------------------ */
 const LANDMARKS = {
   entrance:  { x:37.91, y:98.54, name:"Entrance",           hidden:true },
@@ -100,7 +114,16 @@ const LANDMARKS = {
 const FLOW = ["pumpkin", "graveyard", "ship", "lab", "boss"];
 // Beginner run -> Hard mode unlocks the UFO. Locked until Beginner is cleared.
 const UFO = { x:74.19, y:26.88, name:"UFO Wheat Field", desc:"Hidden in the fields. Only for those who beat the run.", reward:"+ UFO Skin" };
-const TOMB = { x:13.22, y:34.04, name:"Hidden Tomb", desc:"A secret spot. Not in the route yet, shown for layout only.", reward:"", hidden:true };
+
+/* Extra waypoints so the path bends around the map instead of cutting straight across.
+   Add points in order (in % of the map) to steer the curve. */
+const ROUTE_WAYPOINTS = {
+  "entrance->pumpkin":   [[31,85],[24,72]],
+  "pumpkin->graveyard":  [[30,64]],
+  "graveyard->ship":     [[47,70],[56,74]],
+  "ship->lab":           [[64,58],[60,46]],
+  "lab->boss":           [[44,28],[36,18]],
+};
 
 /* ---------- state ---------- */
 const KEY = "halloween-proto-v1";
@@ -108,24 +131,49 @@ function load() { try { return JSON.parse(localStorage.getItem(KEY)) || { done:[
 function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} }
 let state = load();
 
-/* ---------- build the path ---------- */
-const pathPts = ["entrance", ...FLOW].map(k => `${LANDMARKS[k].x},${LANDMARKS[k].y}`).join(" ");
-document.getElementById("path").innerHTML = `<polyline points="${pathPts}"></polyline>`;
+/* ---------- curved path (Catmull-Rom -> cubic bezier) ---------- */
+function curvePath(points) {
+  if (points.length < 2) return "";
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C ${c1[0]} ${c1[1]}, ${c2[0]} ${c2[1]}, ${p2[0]} ${p2[1]}`;
+  }
+  return d;
+}
+function buildRoute() {
+  const seq = ["entrance", ...FLOW];
+  let pts = [];
+  for (let i = 0; i < seq.length - 1; i++) {
+    const a = LANDMARKS[seq[i]], b = LANDMARKS[seq[i + 1]];
+    pts.push([a.x, a.y]);
+    (ROUTE_WAYPOINTS[`${seq[i]}->${seq[i + 1]}`] || []).forEach(p => pts.push(p));
+  }
+  const last = LANDMARKS[seq[seq.length - 1]];
+  pts.push([last.x, last.y]);
+  document.getElementById("path").innerHTML = `<path d="${curvePath(pts)}"></path>`;
+}
+buildRoute();
 
 /* ---------- pins ---------- */
 const pinsEl = document.getElementById("pins");
+let dragMoved = false;
 function pin(id, lm, cls) {
   const b = document.createElement("button");
   b.className = `pin ${cls}`;
   b.style.left = lm.x + "%"; b.style.top = lm.y + "%";
   b.innerHTML = `<span class="dot"></span><span class="label">${lm.name}</span>`;
-  b.onclick = () => open(id);
+  b.onclick = () => { if (!dragMoved) open(id); };
   pinsEl.appendChild(b);
   return b;
 }
 
 function unlockedIndex() {
-  // first flow step not yet done
   const i = FLOW.findIndex(k => !state.done.includes(k));
   return i === -1 ? FLOW.length : i;
 }
@@ -137,11 +185,97 @@ function render() {
     const cls = state.done.includes(k) ? "done" : (i === idx ? "" : "locked");
     pin(k, LANDMARKS[k], cls);
   });
-  const ufoLocked = !state.beginnerCleared;
-  pin("ufo", UFO, "ufo " + (ufoLocked ? "locked" : ""));
+  pin("ufo", UFO, "ufo " + (state.beginnerCleared ? "" : "locked"));
   document.getElementById("mode").textContent = state.beginnerCleared ? "Beginner · Hard unlocked" : "Beginner";
   document.getElementById("progressText").textContent = `${state.done.length}/${FLOW.length} stages`;
 }
+
+/* ---------- zoom & pan ---------- */
+const stage = document.getElementById("stage");
+const world = document.getElementById("world");
+const MIN_Z = 1, MAX_Z = 4;
+let view = { z:1, x:0, y:0 };   // x/y in stage pixels
+
+function stageSize() { return { w: stage.offsetWidth, h: stage.offsetHeight }; }
+function clampView(v) {
+  const { w, h } = stageSize();
+  v.z = Math.min(MAX_Z, Math.max(MIN_Z, v.z));
+  v.x = Math.min(0, Math.max(w * (1 - v.z), v.x));
+  v.y = Math.min(0, Math.max(h * (1 - v.z), v.y));
+  return v;
+}
+function applyView() {
+  world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
+  // keep pin size steady while zooming: counter-scale pins a little
+  pinsEl.style.setProperty("--pin-scale", String(1 / Math.sqrt(view.z)));
+}
+function zoomAt(cx, cy, factor) {
+  const nz = Math.min(MAX_Z, Math.max(MIN_Z, view.z * factor));
+  const k = nz / view.z;
+  view = clampView({ z: nz, x: cx - (cx - view.x) * k, y: cy - (cy - view.y) * k });
+  applyView();
+}
+function zoomCenter(factor) {
+  const { w, h } = stageSize();
+  zoomAt(w / 2, h / 2, factor);
+}
+function resetView() { view = { z:1, x:0, y:0 }; applyView(); }
+
+document.getElementById("zIn").onclick = () => zoomCenter(1.4);
+document.getElementById("zOut").onclick = () => zoomCenter(1 / 1.4);
+document.getElementById("zReset").onclick = resetView;
+
+// Mouse wheel / trackpad zoom around the cursor
+stage.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+}, { passive:false });
+
+// Pointer drag (pan) and two-finger pinch (zoom)
+const pointers = new Map();
+let lastPinchDist = null;
+stage.addEventListener("pointerdown", e => {
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY });
+  dragMoved = false;
+});
+stage.addEventListener("pointermove", e => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  const prev = { x:p.x, y:p.y };
+  p.x = e.clientX; p.y = e.clientY;
+
+  if (pointers.size === 1) {
+    const dx = p.x - prev.x, dy = p.y - prev.y;
+    if (Math.hypot(p.x - p.sx, p.y - p.sy) > 6) dragMoved = true;
+    if (dragMoved) {
+      stage.classList.add("dragging");
+      view = clampView({ z:view.z, x:view.x + dx, y:view.y + dy });
+      applyView();
+    }
+  } else if (pointers.size === 2) {
+    dragMoved = true;
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    if (lastPinchDist) {
+      const r = stage.getBoundingClientRect();
+      zoomAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, dist / lastPinchDist);
+    }
+    lastPinchDist = dist;
+  }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) lastPinchDist = null;
+  if (pointers.size === 0) {
+    stage.classList.remove("dragging");
+    setTimeout(() => { dragMoved = false; }, 0);
+  }
+}
+stage.addEventListener("pointerup", endPointer);
+stage.addEventListener("pointercancel", endPointer);
+
+window.addEventListener("resize", () => { view = clampView(view); applyView(); });
 
 /* ---------- modal ---------- */
 let current = null;
@@ -150,7 +284,7 @@ function open(id) {
   const isUfo = id === "ufo";
   const lm = isUfo ? UFO : LANDMARKS[id];
   const idx = FLOW.indexOf(id);
-  const locked = isUfo ? !state.beginnerCleared : (idx > unlockedIndex() || state.done.includes(id) && false) || (idx > unlockedIndex());
+  const locked = isUfo ? !state.beginnerCleared : idx > unlockedIndex();
   const done = !isUfo && state.done.includes(id);
   document.getElementById("mTitle").textContent = lm.name;
   document.getElementById("mDesc").textContent = locked
@@ -191,6 +325,7 @@ document.getElementById("reset").onclick = () => {
 };
 
 render();
+applyView();
 </script>
 </body>
 </html>
