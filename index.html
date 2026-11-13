@@ -9,7 +9,7 @@
 <style>
 :root{--navy:#070d24;--panel:#0b1433e8;--panel2:#111c44;--line:#22305e;--line2:#34477a;--txt:#f2f5ff;--mute:#8d9bc4;
   --cyan:#19e6ff;--violet:#9d7bff;--orange:#ff8a1f;--pink:#ff3fb4;--mana:#38c6ff;--ok:#4dffb0;
-  --bsz:min(calc(100vh - 210px),calc(100vw - 760px),780px)}
+  --bsz:min(calc(100vh - 210px),calc(100vw - 820px),780px)}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--navy);color:var(--txt);font:14px/1.4 Rubik,"Segoe UI",system-ui,sans-serif;overflow-x:hidden}
@@ -170,7 +170,7 @@ body.focus .stage{grid-template-columns:auto;padding-top:24px}
 #focusHint{position:fixed;right:14px;bottom:12px;font-size:11px;color:#fff8;display:none}
 body.focus #focusHint{display:block}
 @keyframes pulse{50%{opacity:.5}}
-@media (max-width:1300px){:root{--bsz:min(calc(100vw - 420px),calc(100vh - 210px))}.stage{grid-template-columns:auto 340px}aside.left{grid-column:2;grid-row:1}aside.right{grid-column:2}.stage{grid-auto-flow:row dense}}
+@media (max-width:1300px){:root{--bsz:min(calc(100vw - 500px),calc(100vh - 210px))}.stage{grid-template-columns:auto 340px}aside.left{grid-column:2;grid-row:1}aside.right{grid-column:2}.stage{grid-auto-flow:row dense}}
 @media (max-width:900px){:root{--bsz:calc(100vw - 72px)}.stage{grid-template-columns:1fr}aside.left,aside.right{grid-column:auto;grid-row:auto}#spells{max-height:none}.top{grid-template-columns:1fr auto}.top .logo{display:none}}
 </style>
 </head>
