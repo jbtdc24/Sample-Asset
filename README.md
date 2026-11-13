@@ -1,9 +1,10 @@
-# Spell Chess Sandbox
+# Anichess Spell Sandbox
 
-Open `index.html` in a browser (or GitHub Pages).
+Open `index.html` (best via GitHub Pages or any local web server).
 
-- **Play**: move White or Black (Anichess rules: capture the king wins). Flip board with `F`.
-- **Creative**: place/erase any piece, move pieces anywhere, pick side to move.
-- **Spells**: all 17 Anichess spells, castable for the side to move. Infinite mana toggle, forced Chaos Summon result, spell banner + FX for recording previews.
-- Skins: Classic (Anichess Classic Skin, `skins/classic/`) and Neon. Picker in the header.
-- Undo = Ctrl+Z, cancel spell = Esc.
+- **Play**: move White and Black (capture the king wins).
+- **Creative**: place/erase any piece anywhere, move pieces freely. Spells work here too.
+- **Spells**: all 17 Anichess spells with cast animation + per-spell effects. Click a spell, then the glowing squares.
+- **Cosmetics**: pick Board, Pieces and Background separately (21 sets) any time. "Use full set" applies one set to all three.
+- **Record view** (H): hides panels, board only. Flip = F, Undo = Ctrl+Z, Esc = cancel.
+- Skins are rebuilt from `D:/ANICHESS EDIT/Cosmetics` with `tools/build_skins.py skins`.
